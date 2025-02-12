@@ -6,7 +6,7 @@ type Transaction struct {
 	BaseModel
 	SrcAddr string `json:"src_addr"`
 	DstAddr string `json:"dst_addr"`
-	CoinID  int    `json:"coin_id"`
+	CoinID  uint   `json:"coin_id"`
 	Coin    Coin
 	Amount  uint64 `json:"amount"`
 	TxHash  string `json:"tx_hash"`

@@ -158,7 +158,7 @@ func listenTonWallet(ctx context.Context, api ton.APIClientWrapped, wallet model
 							Amount:  transfer.Amount.Nano().Uint64(),
 							TxHash:  fmt.Sprintf("%q\n", string(tx.Hash)),
 							Memo:    memo,
-							CoinID:  int(dbUsdt.ID),
+							CoinID:  dbUsdt.ID,
 							LT:      tx.LT,
 						}
 
@@ -190,7 +190,7 @@ func listenTonWallet(ctx context.Context, api ton.APIClientWrapped, wallet model
 						Amount:  ti.Amount.Nano().Uint64(),
 						TxHash:  fmt.Sprintf("%q\n", string(tx.Hash)),
 						Memo:    ti.Comment(),
-						CoinID:  int(dbTON.ID),
+						CoinID:  dbTON.ID,
 						LT:      tx.LT,
 					}
 

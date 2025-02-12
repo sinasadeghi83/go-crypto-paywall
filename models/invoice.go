@@ -23,7 +23,7 @@ type Invoice struct {
 	Memo         string        `gorm:"type:varchar(100);uniqueIndex" json:"memo"`
 	Status       InvoiceStatus `json:"status"`
 	Price        uint64        `json:"price"`
-	CoinID       int           `json:"coin_id"`
+	CoinID       uint          `json:"coin_id"`
 	Coin         Coin          `json:"-"`
 	AcceptOthers bool          `gorm:"default:0" json:"accept_others"` //does this invoice accept other coins too?
 	ExpiresAt    time.Time     `json:"expires_at"`
