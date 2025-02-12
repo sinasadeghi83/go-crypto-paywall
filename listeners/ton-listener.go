@@ -71,7 +71,7 @@ func listenTonWallet(ctx context.Context, api ton.APIClientWrapped, wallet model
 	asqClient := asynq.NewClient(asynq.RedisClientOpt{Addr: queue.RedisAddr})
 	defer asqClient.Close()
 
-	master, err := api.CurrentMasterchainInfo(context.Background()) // we fetch block just to trigger chain proof check
+	master, err := api.CurrentMasterchainInfo(ctx) // we fetch block just to trigger chain proof check
 	if err != nil {
 		log.Fatalln("get masterchain info err: ", err.Error())
 		return err
@@ -79,7 +79,7 @@ func listenTonWallet(ctx context.Context, api ton.APIClientWrapped, wallet model
 	// address on which we are accepting payments
 	treasuryAddress := address.MustParseAddr(wallet.Addr)
 
-	_, err = api.GetAccount(context.Background(), master, treasuryAddress)
+	_, err = api.GetAccount(ctx, master, treasuryAddress)
 	if err != nil {
 		log.Fatalln("get masterchain info err: ", err.Error())
 		return err
@@ -132,33 +132,65 @@ func listenTonWallet(ctx context.Context, api ton.APIClientWrapped, wallet model
 		fmt.Println("LISTENER DONE")
 		return nil
 	default:
-	// listen for new transactions from channel
-	for tx := range transactions {
-		// only internal messages can increase the balance
-		if tx.IO.In != nil && tx.IO.In.MsgType == tlb.MsgTypeInternal {
-			ti := tx.IO.In.AsInternal()
-			src := ti.SrcAddr
+		// listen for new transactions from channel
+		for tx := range transactions {
+			// only internal messages can increase the balance
+			if tx.IO.In != nil && tx.IO.In.MsgType == tlb.MsgTypeInternal {
+				ti := tx.IO.In.AsInternal()
+				src := ti.SrcAddr
 
-			if dsc, ok := tx.Description.(tlb.TransactionDescriptionOrdinary); ok && dsc.BouncePhase != nil {
-				// transaction was bounced, and coins was returned to sender
-				// this can happen mostly on custom contracts
-				continue
-			}
+				if dsc, ok := tx.Description.(tlb.TransactionDescriptionOrdinary); ok && dsc.BouncePhase != nil {
+					// transaction was bounced, and coins was returned to sender
+					// this can happen mostly on custom contracts
+					continue
+				}
 
-			// verify that event sender is our jetton wallet
-			if ti.SrcAddr.Equals(treasuryJettonWallet.Address()) {
-				var transfer jetton.TransferNotification
-				if err = tlb.LoadFromCell(&transfer, ti.Body.BeginParse()); err == nil {
-					memo, _ := transfer.ForwardPayload.BeginParse().LoadStringSnake()
-					src = transfer.Sender
+				// verify that event sender is our jetton wallet
+				if ti.SrcAddr.Equals(treasuryJettonWallet.Address()) {
+					var transfer jetton.TransferNotification
+					if err = tlb.LoadFromCell(&transfer, ti.Body.BeginParse()); err == nil {
+						memo, _ := transfer.ForwardPayload.BeginParse().LoadStringSnake()
+						src = transfer.Sender
+
+						dbTx := models.Transaction{
+							SrcAddr: transfer.Sender.String(),
+							DstAddr: wallet.Addr,
+							Amount:  transfer.Amount.Nano().Uint64(),
+							TxHash:  fmt.Sprintf("%q\n", string(tx.Hash)),
+							Memo:    memo,
+							CoinID:  int(dbUsdt.ID),
+							LT:      tx.LT,
+						}
+
+						if res := db.Save(&dbTx); res.Error != nil {
+							log.Fatalln("Unable to record transaction err:", res.Error)
+							return res.Error
+						}
+						task, err := tasks.NewTxDeliveryTask(dbTx, wallet)
+						if err != nil {
+							log.Fatalln("Unable to enqueue transaction err:", err)
+							return err
+						}
+						info, err := asqClient.Enqueue(task)
+						if err != nil {
+							log.Fatalf("could not enqueue task: %v", err)
+						}
+						log.Printf("enqueued task: id=%s queue=%s", info.ID, info.Queue)
+						log.Println("received", transfer.Amount.Nano(), "USDT from", src.String(), " With memo: ", memo)
+					}
+				} else {
+					if ti.Amount.Nano().Sign() > 0 {
+						// show received ton amount
+						log.Println("received", ti.Amount.String(), "TON from", src.String(), "with memo", ti.Comment())
+					}
 
 					dbTx := models.Transaction{
-						SrcAddr: transfer.Sender.String(),
+						SrcAddr: src.String(),
 						DstAddr: wallet.Addr,
-						Amount:  transfer.Amount.Nano().Uint64(),
+						Amount:  ti.Amount.Nano().Uint64(),
 						TxHash:  fmt.Sprintf("%q\n", string(tx.Hash)),
-						Memo:    memo,
-						CoinID:  int(dbUsdt.ID),
+						Memo:    ti.Comment(),
+						CoinID:  int(dbTON.ID),
 						LT:      tx.LT,
 					}
 
@@ -166,50 +198,18 @@ func listenTonWallet(ctx context.Context, api ton.APIClientWrapped, wallet model
 						log.Fatalln("Unable to record transaction err:", res.Error)
 						return res.Error
 					}
-					task, err := tasks.NewTxDeliveryTask(dbTx, wallet)
-					if err != nil {
-						log.Fatalln("Unable to enqueue transaction err:", err)
-						return err
-					}
-					info, err := asqClient.Enqueue(task)
-					if err != nil {
-						log.Fatalf("could not enqueue task: %v", err)
-					}
-					log.Printf("enqueued task: id=%s queue=%s", info.ID, info.Queue)
-					log.Println("received", transfer.Amount.Nano(), "USDT from", src.String(), " With memo: ", memo)
-				}
-			} else {
-				if ti.Amount.Nano().Sign() > 0 {
-					// show received ton amount
-					log.Println("received", ti.Amount.String(), "TON from", src.String(), "with memo", ti.Comment())
-				}
-
-				dbTx := models.Transaction{
-					SrcAddr: src.String(),
-					DstAddr: wallet.Addr,
-					Amount:  ti.Amount.Nano().Uint64(),
-					TxHash:  fmt.Sprintf("%q\n", string(tx.Hash)),
-					Memo:    ti.Comment(),
-					CoinID:  int(dbTON.ID),
-					LT:      tx.LT,
-				}
-
-				if res := db.Save(&dbTx); res.Error != nil {
-					log.Fatalln("Unable to record transaction err:", res.Error)
-					return res.Error
 				}
 			}
+
+			// update last processed lt and save it in db
+			lastProcessedLT = tx.LT
+			fmt.Println("Last Processed LT: ", lastProcessedLT)
 		}
 
-		// update last processed lt and save it in db
-		lastProcessedLT = tx.LT
-		fmt.Println("Last Processed LT: ", lastProcessedLT)
+		// it can happen due to none of available liteservers know old enough state for our address
+		// (when our unprocessed transactions are too old)
+		log.Println("something went wrong, transaction listening unexpectedly finished")
+		return fmt.Errorf("something went wrong, transaction listening unexpectedly finished")
 	}
-
-	// it can happen due to none of available liteservers know old enough state for our address
-	// (when our unprocessed transactions are too old)
-	log.Println("something went wrong, transaction listening unexpectedly finished")
-	return fmt.Errorf("something went wrong, transaction listening unexpectedly finished")
-}
-return nil
+	return nil
 }
