@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/url"
+	"os"
 
 	"github.com/xssnick/tonutils-go/address"
 	"github.com/xssnick/tonutils-go/tlb"
@@ -24,6 +25,21 @@ type CryptoWallet struct {
 	Addr    string `json:"addr"`
 	Network string `json:"network"`
 	Status  string
+}
+
+func GetTransferURL(db *gorm.DB, name, amount, memo string) string {
+	var coin Coin
+	db.First(&coin, "name = ?", name)
+	var w CryptoWallet
+	db.Where("network = ?", coin.Network).First(&w, "status = 'active'")
+	if coin.Unit == "USDT" && coin.Network == "TON" {
+		usdt_addr := "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+		if os.Getenv("env") != "prod" {
+			usdt_addr = "kQD0GKBM8ZbryVk2aESmzfU6b9b_8era_IkvBSELujFZPsyy"
+		}
+		return w.TokenTonURL(amount, memo, usdt_addr)
+	}
+	return w.TonURL(amount, memo)
 }
 
 func (crypto *CryptoWallet) TonURL(amount string, memo string) string {
