@@ -30,6 +30,9 @@ func main() {
 	queue.Setup(ctx, redisAddr, func(t models.Transaction, i models.Invoice, cw models.CryptoWallet) {
 		fmt.Println("Invoice paid:", i)
 	})
+	var w models.CryptoWallet
+	database.GetDB().First(&w, "status = 'active' and network = 'TON'")
+	fmt.Println("TON URL:", w.TokenTonURL("1100000", "trump", "kQD0GKBM8ZbryVk2aESmzfU6b9b_8era_IkvBSELujFZPsyy"))
 
 	// Step3: listen for payments
 	listeners.ListenPayments(ctx)
