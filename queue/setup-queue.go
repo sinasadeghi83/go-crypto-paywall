@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/hibiken/asynq"
-	"github.com/sinasadeghi83/go-paywall/tasks"
+	"github.com/sinasadeghi83/go-crypto-paywall/tasks"
 )
 
 var RedisAddr string

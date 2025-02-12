@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
-	database "github.com/sinasadeghi83/go-paywall/db"
-	"github.com/sinasadeghi83/go-paywall/models"
+	database "github.com/sinasadeghi83/go-crypto-paywall/db"
+	"github.com/sinasadeghi83/go-crypto-paywall/models"
 )
 
 type HandlePaid func(models.Transaction, models.Invoice, models.CryptoWallet)

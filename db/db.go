@@ -1,7 +1,7 @@
 package database
 
 import (
-	"github.com/sinasadeghi83/go-paywall/models"
+	"github.com/sinasadeghi83/go-crypto-paywall/models"
 	"gorm.io/gorm"
 )
 

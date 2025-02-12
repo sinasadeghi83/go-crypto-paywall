@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	database "github.com/sinasadeghi83/go-paywall/db"
-	"github.com/sinasadeghi83/go-paywall/listeners"
-	"github.com/sinasadeghi83/go-paywall/models"
-	"github.com/sinasadeghi83/go-paywall/queue"
+	database "github.com/sinasadeghi83/go-crypto-paywall/db"
+	"github.com/sinasadeghi83/go-crypto-paywall/listeners"
+	"github.com/sinasadeghi83/go-crypto-paywall/models"
+	"github.com/sinasadeghi83/go-crypto-paywall/queue"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
