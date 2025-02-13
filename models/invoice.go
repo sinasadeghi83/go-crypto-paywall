@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"time"
 
 	"gorm.io/gorm"
@@ -31,6 +32,26 @@ type Invoice struct {
 
 func (in *Invoice) Migrate(db *gorm.DB) {
 	db.AutoMigrate(&Invoice{})
+}
+
+func GetURLByInvoiceID(db *gorm.DB, invoiceID int) string {
+	var invoice *Invoice
+	db.First(&invoice, invoiceID)
+	return invoice.GetURL(db)
+}
+
+func (invoice *Invoice) GetURL(db *gorm.DB) string {
+	var w CryptoWallet
+	db.Where("network = ?", invoice.Coin.Network).First(&w, "status = 'active'")
+	amount := fmt.Sprintf("%d", invoice.Price)
+	if invoice.Coin.Unit == "USDT" && invoice.Coin.Network == "TON" {
+		usdt_addr := "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+		if os.Getenv("env") != "prod" {
+			usdt_addr = "kQD0GKBM8ZbryVk2aESmzfU6b9b_8era_IkvBSELujFZPsyy"
+		}
+		return w.TokenTonURL(amount, invoice.Memo, usdt_addr)
+	}
+	return w.TonURL(amount, invoice.Memo)
 }
 
 func (in *Invoice) Create(db *gorm.DB) error {
