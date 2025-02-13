@@ -34,7 +34,7 @@ func (in *Invoice) Migrate(db *gorm.DB) {
 	db.AutoMigrate(&Invoice{})
 }
 
-func GetURLByInvoiceID(db *gorm.DB, invoiceID int) string {
+func GetURLByInvoiceID(db *gorm.DB, invoiceID uint) string {
 	var invoice *Invoice
 	db.First(&invoice, invoiceID)
 	return invoice.GetURL(db)
