@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type InvoiceStatus string
@@ -36,7 +37,7 @@ func (in *Invoice) Migrate(db *gorm.DB) {
 
 func GetURLByInvoiceID(db *gorm.DB, invoiceID uint) string {
 	var invoice *Invoice
-	db.First(&invoice, invoiceID)
+	db.Preload(clause.Associations).Find(&invoice, invoiceID)
 	return invoice.GetURL(db)
 }
 
