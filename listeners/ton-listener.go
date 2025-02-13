@@ -88,7 +88,7 @@ func listenTonWallet(ctx context.Context, api ton.APIClientWrapped, wallet model
 	db := database.GetDB()
 
 	var lastTx models.Transaction
-	db.Order("created_at desc").First(&lastTx, "src_addr = ?", wallet.Addr)
+	db.Order("created_at desc").First(&lastTx, "dst_addr = ?", wallet.Addr)
 
 	// Cursor of processed transaction, save it to your db
 	// We start from last transaction, will not process transactions older than we started from.
