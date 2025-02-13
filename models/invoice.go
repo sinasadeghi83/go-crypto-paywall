@@ -79,6 +79,9 @@ func (in *Invoice) CancelInvoice(db *gorm.DB) error {
 }
 
 func (in *Invoice) CheckExpire(db *gorm.DB) error {
+	if in.Status != PendingInvoice && in.Status != HalfpaidInvoice {
+		return nil
+	}
 	if time.Now().After(in.ExpiresAt) {
 		in.Status = ExpiredInvoice
 	}
@@ -94,7 +97,7 @@ func (in *Invoice) ApplyTx(db *gorm.DB, tx Transaction) (error, error) {
 	if err := in.CheckExpire(db); err != nil {
 		return err, nil
 	}
-	if in.Status == ExpiredInvoice || in.Status == CancelledInvoice {
+	if in.Status != PendingInvoice && in.Status != HalfpaidInvoice {
 		return nil, fmt.Errorf("invoice is expired or cancelled")
 	}
 
