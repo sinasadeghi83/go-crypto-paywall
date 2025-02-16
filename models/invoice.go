@@ -41,6 +41,12 @@ func GetURLByInvoiceID(db *gorm.DB, invoiceID uint) string {
 	return invoice.GetURL(db)
 }
 
+func GetAddrMemoByInvoiceID(db *gorm.DB, invoiceID uint) (string, string) {
+	var invoice *Invoice
+	db.Preload(clause.Associations).Find(&invoice, invoiceID)
+	return invoice.GetAddr(db), invoice.Memo
+}
+
 func (invoice *Invoice) GetURL(db *gorm.DB) string {
 	var w CryptoWallet
 	db.Where("network = ?", invoice.Coin.Network).First(&w, "status = 'active'")
@@ -53,6 +59,12 @@ func (invoice *Invoice) GetURL(db *gorm.DB) string {
 		return w.TokenTonURL(amount, invoice.Memo, usdt_addr)
 	}
 	return w.TonURL(amount, invoice.Memo)
+}
+
+func (invoice *Invoice) GetAddr(db *gorm.DB) string {
+	var w CryptoWallet
+	db.Where("network = ?", invoice.Coin.Network).First(&w, "status = 'active'")
+	return w.Addr
 }
 
 func (in *Invoice) Create(db *gorm.DB) error {
